@@ -12,39 +12,7 @@ BASE_DIR = os.path.expanduser(f"~/Documents/{APP_NAME}")
 CAPTURES_DIR = os.path.join(BASE_DIR, "Captures")
 LOGS_DIR = os.path.join(BASE_DIR, "Logs")
 APP_ICON = "📸"
-SCREENSHOT_INTERVAL = 60  # seconds
-
-def check_screen_recording_permission():
-    """Check if screen recording permission is granted."""
-    try:
-        # Try to take a small test screenshot
-        with mss.mss() as sct:
-            # Capture a small area from the main monitor
-            if len(sct.monitors) > 1:
-                monitor = sct.monitors[1]
-                test_area = {
-                    'top': monitor['top'], 
-                    'left': monitor['left'], 
-                    'width': 100, 
-                    'height': 100
-                }
-                img = sct.grab(test_area)
-                # If we can grab and the image has content, permission is likely granted
-                return True
-    except Exception as e:
-        print(f"Permission check failed: {e}")
-        return False
-
-def take_screenshot_with_screencapture(output_path, display_number=1):
-    """Alternative screenshot method using macOS screencapture command."""
-    try:
-        # Use macOS built-in screencapture command
-        cmd = ["screencapture", "-D", str(display_number), "-x", output_path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.returncode == 0
-    except Exception as e:
-        print(f"screencapture failed: {e}")
-        return False 
+SCREENSHOT_INTERVAL = 60  # seconds 
 
 class MacCappyApp(rumps.App):
     def __init__(self):
@@ -54,7 +22,6 @@ class MacCappyApp(rumps.App):
             "---", 
             rumps.MenuItem("Auto Screenshots: ON", callback=self.toggle_auto_screenshots),
             "---",
-            "Check Permissions",
             "Debug: Open Log Folder", 
             "---"
         ]
@@ -65,14 +32,6 @@ class MacCappyApp(rumps.App):
             os.makedirs(LOGS_DIR, exist_ok=True)
         except Exception as e:
             rumps.alert(title="Setup Error", message=f"Failed to create directories: {e}")
-        
-        # Check permissions on startup
-        if not check_screen_recording_permission():
-            rumps.notification(
-                title=APP_NAME,
-                subtitle="Permission Required",
-                message="Click 'Check Permissions' to enable screen recording"
-            )
         
         # Auto-screenshot functionality
         self.auto_screenshots_enabled = True
@@ -102,20 +61,13 @@ class MacCappyApp(rumps.App):
             today_captures_dir = os.path.join(CAPTURES_DIR, date_folder)
             os.makedirs(today_captures_dir, exist_ok=True)
             
-            # Capture screenshots silently
+            # Capture screenshots silently - SIMPLE VERSION LIKE ORIGINAL
             screenshot_count = 0
             with mss.mss() as sct:
-                if len(sct.monitors) > 1:
-                    for i, monitor in enumerate(sct.monitors[1:], 1):
-                        filename = os.path.join(today_captures_dir, f"{time_filename_base}-auto-screen-{i}.png")
-                        sct.shot(mon=i, output=filename)
-                        screenshot_count += 1
-                        
-                        # Check if screenshot captured actual content
-                        if os.path.exists(filename):
-                            file_size = os.path.getsize(filename)
-                            if file_size < 1000:  # Very small file suggests permission issue
-                                print(f"Warning: Screenshot {filename} is unusually small ({file_size} bytes)")
+                for i, monitor in enumerate(sct.monitors[1:], 1):
+                    filename = os.path.join(today_captures_dir, f"{time_filename_base}-auto-screen-{i}.png")
+                    sct.shot(mon=i, output=filename)
+                    screenshot_count += 1
             
             # Update menu bar title to show last capture time
             self.title = f"📸 {timestamp.strftime('%H:%M')}"
@@ -165,45 +117,22 @@ class MacCappyApp(rumps.App):
             rumps.alert(title="Directory Error", message=f"Failed to create today's folders: {e}")
             return
         
-        # 2. Capture screenshots of all monitors
+        # 2. Capture screenshots of all monitors - SIMPLE VERSION LIKE ORIGINAL
         screenshot_paths = []
         try:
             with mss.mss() as sct:
-                # Check if we have any monitors
-                if len(sct.monitors) <= 1:
-                    rumps.alert(title="Monitor Error", message="No monitors detected for screenshot capture.")
-                    return
-                    
                 for i, monitor in enumerate(sct.monitors[1:], 1): # sct.monitors[0] is all screens
                     filename = os.path.join(today_captures_dir, f"{time_filename_base}-milestone-screen-{i}.png")
+                    sct.shot(mon=i, output=filename)
+                    screenshot_paths.append(filename)
                     
-                    # Try MSS first, then fallback to screencapture
-                    try:
-                        sct.shot(mon=i, output=filename)
-                        # Check if file is reasonable size
-                        if os.path.exists(filename) and os.path.getsize(filename) < 1000:
-                            # File too small, try screencapture instead
-                            if take_screenshot_with_screencapture(filename, i):
-                                print(f"Used screencapture fallback for monitor {i}")
-                    except:
-                        # MSS failed, try screencapture
-                        if take_screenshot_with_screencapture(filename, i):
-                            print(f"MSS failed, used screencapture for monitor {i}")
-                    
-                    if os.path.exists(filename):
-                        screenshot_paths.append(filename)
-                    
-            if screenshot_paths:
-                rumps.notification(
-                    title=APP_NAME,
-                    subtitle="Screenshots Captured!",
-                    message=f"Saved {len(screenshot_paths)} screen(s). Now, add your note."
-                )
-            else:
-                rumps.alert(title="Screenshot Error", message="Failed to capture any screenshots. Check permissions.")
-                return
+            rumps.notification(
+                title=APP_NAME,
+                subtitle="Screenshots Captured!",
+                message=f"Saved {len(screenshot_paths)} screen(s). Now, add your note."
+            )
         except Exception as e:
-            rumps.alert(title="Screenshot Error", message=f"Failed to capture screens: {e}\n\nTry clicking 'Check Permissions' to resolve this issue.")
+            rumps.alert(title="Screenshot Error", message=f"Failed to capture screens: {e}")
             return
 
         # 3. Ask for a developer note
@@ -239,56 +168,6 @@ class MacCappyApp(rumps.App):
                 subtitle="Capture Canceled",
                 message="The milestone was not saved."
             )
-
-    @rumps.clicked("Check Permissions")
-    def check_permissions(self, _):
-        """Check and guide user through screen recording permissions."""
-        try:
-            # Test screenshot capability
-            with mss.mss() as sct:
-                if len(sct.monitors) > 1:
-                    # Try to capture a test screenshot
-                    monitor = sct.monitors[1]
-                    test_filename = os.path.join(CAPTURES_DIR, "permission_test.png")
-                    sct.shot(mon=1, output=test_filename)
-                    
-                    # Check if file was created and has reasonable size
-                    if os.path.exists(test_filename):
-                        file_size = os.path.getsize(test_filename)
-                        os.remove(test_filename)  # Clean up test file
-                        
-                        if file_size > 1000:  # Reasonable screenshot size
-                            rumps.alert(
-                                title="Permissions OK", 
-                                message="Screen recording permissions appear to be working correctly!"
-                            )
-                            return
-                        else:
-                            # File too small, likely just background
-                            raise Exception("Screenshot only captured background")
-                    else:
-                        raise Exception("Failed to create screenshot file")
-                        
-        except Exception as e:
-            # Permission issue detected
-            rumps.alert(
-                title="Screen Recording Permission Required",
-                message="""mac-cappy needs Screen Recording permission to capture application windows.
-
-Please:
-1. Open System Preferences/Settings
-2. Go to Security & Privacy → Privacy → Screen Recording
-3. Add and enable 'Python' or 'Terminal'
-4. Restart mac-cappy
-
-Current issue: Only capturing desktop background, not application windows."""
-            )
-            
-            # Open System Preferences to the right location
-            subprocess.run([
-                "open", 
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-            ])
 
     @rumps.clicked("Debug: Open Log Folder")
     def open_log_folder(self, _):
