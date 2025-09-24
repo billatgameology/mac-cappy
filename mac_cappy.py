@@ -4,6 +4,7 @@ import os
 import subprocess
 import threading
 import time
+import hashlib
 from datetime import datetime
 
 # --- Configuration ---
@@ -17,10 +18,20 @@ SCREENSHOT_INTERVAL = 60  # seconds
 class MacCappyApp(rumps.App):
     def __init__(self):
         super(MacCappyApp, self).__init__(APP_NAME, icon=None, title=APP_ICON)
+        
+        # Initialize skip counter and previous screenshot hashes
+        self.idle_skip_count = 0
+        self.previous_screenshot_hashes = {}  # monitor_id -> hash
+        
+        # Create menu items with references
+        self.auto_toggle_item = rumps.MenuItem("Auto Screenshots: ON", callback=self.toggle_auto_screenshots)
+        self.skip_counter_item = rumps.MenuItem("Idle Skips: 0", callback=None)
+        
         self.menu = [
             "Manual Capture + Note", 
             "---", 
-            rumps.MenuItem("Auto Screenshots: ON", callback=self.toggle_auto_screenshots),
+            self.auto_toggle_item,
+            self.skip_counter_item,
             "---",
             "Debug: Open Log Folder", 
             "---"
@@ -50,8 +61,65 @@ class MacCappyApp(rumps.App):
             self.screenshot_timer.stop()
             self.screenshot_timer = None
     
+    def get_screenshot_hash(self, sct, monitor_id):
+        """Get a hash of the screenshot for comparison without saving to disk.
+        Uses multiple small sample areas to avoid clock changes."""
+        try:
+            # Get monitor dimensions
+            monitor = sct.monitors[monitor_id]
+            width = monitor['width']
+            height = monitor['height']
+            
+            # Define multiple sample areas (avoiding corners where clocks usually are)
+            sample_size = 100  # 100x100 pixel samples
+            sample_areas = [
+                # Center
+                {
+                    'top': monitor['top'] + height // 2 - sample_size // 2,
+                    'left': monitor['left'] + width // 2 - sample_size // 2,
+                    'width': sample_size,
+                    'height': sample_size
+                },
+                # Left middle
+                {
+                    'top': monitor['top'] + height // 2 - sample_size // 2,
+                    'left': monitor['left'] + width // 4 - sample_size // 2,
+                    'width': sample_size,
+                    'height': sample_size
+                },
+                # Right middle
+                {
+                    'top': monitor['top'] + height // 2 - sample_size // 2,
+                    'left': monitor['left'] + 3 * width // 4 - sample_size // 2,
+                    'width': sample_size,
+                    'height': sample_size
+                }
+            ]
+            
+            # Capture all sample areas and combine hashes
+            combined_hash = hashlib.md5()
+            for area in sample_areas:
+                try:
+                    screenshot = sct.grab(area)
+                    screenshot_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
+                    combined_hash.update(screenshot_bytes)
+                except:
+                    # If any sample fails, skip it
+                    continue
+            
+            return combined_hash.hexdigest()
+            
+        except Exception as e:
+            print(f"Hash generation failed for monitor {monitor_id}: {e}")
+            return None
+    
+    def update_idle_skip_counter(self):
+        """Update the idle skip counter in the menu."""
+        self.skip_counter_item.title = f"Idle Skips: {self.idle_skip_count}"
+        print(f"[DEBUG] Updated idle skip counter to: {self.idle_skip_count}")
+
     def take_auto_screenshot(self, sender):
-        """Take automatic screenshots without user interaction."""
+        """Take automatic screenshots without user interaction, with duplicate detection."""
         try:
             timestamp = datetime.now()
             date_folder = timestamp.strftime("%Y-%m-%d")
@@ -61,16 +129,46 @@ class MacCappyApp(rumps.App):
             today_captures_dir = os.path.join(CAPTURES_DIR, date_folder)
             os.makedirs(today_captures_dir, exist_ok=True)
             
-            # Capture screenshots silently - SIMPLE VERSION LIKE ORIGINAL
-            screenshot_count = 0
+            # Check for changes before saving
             with mss.mss() as sct:
+                current_hashes = {}
+                has_changes = False
+                
+                # Get hashes for all monitors
                 for i, monitor in enumerate(sct.monitors[1:], 1):
-                    filename = os.path.join(today_captures_dir, f"{time_filename_base}-auto-screen-{i}.png")
-                    sct.shot(mon=i, output=filename)
-                    screenshot_count += 1
-            
-            # Update menu bar title to show last capture time
-            self.title = f"📸 {timestamp.strftime('%H:%M')}"
+                    current_hash = self.get_screenshot_hash(sct, i)
+                    current_hashes[i] = current_hash
+                    
+                    # Compare with previous hash
+                    previous_hash = self.previous_screenshot_hashes.get(i)
+                    if previous_hash is None or previous_hash != current_hash:
+                        has_changes = True
+                        print(f"[DEBUG] Monitor {i}: Changes detected (prev: {previous_hash[:8] if previous_hash else 'None'}..., curr: {current_hash[:8] if current_hash else 'None'}...)")
+                    else:
+                        print(f"[DEBUG] Monitor {i}: No changes (hash: {current_hash[:8] if current_hash else 'None'}...)")
+                
+                if has_changes:
+                    # Save screenshots only if there are changes
+                    screenshot_count = 0
+                    for i, monitor in enumerate(sct.monitors[1:], 1):
+                        filename = os.path.join(today_captures_dir, f"{time_filename_base}-auto-screen-{i}.png")
+                        sct.shot(mon=i, output=filename)
+                        screenshot_count += 1
+                    
+                    # Update previous hashes
+                    self.previous_screenshot_hashes = current_hashes
+                    
+                    # Update menu bar title to show last capture time
+                    self.title = f"📸 {timestamp.strftime('%H:%M')}"
+                    print(f"[DEBUG] Screenshots saved - changes detected")
+                else:
+                    # No changes detected, increment skip counter
+                    self.idle_skip_count += 1
+                    self.update_idle_skip_counter()
+                    
+                    # Update title to show skip
+                    self.title = f"📸 {timestamp.strftime('%H:%M')} (skip)"
+                    print(f"[DEBUG] Screenshots skipped - no changes (skip count: {self.idle_skip_count})")
             
         except Exception as e:
             # Silent failure for auto-screenshots to avoid interrupting user
@@ -82,7 +180,11 @@ class MacCappyApp(rumps.App):
         self.auto_screenshots_enabled = not self.auto_screenshots_enabled
         
         if self.auto_screenshots_enabled:
-            sender.title = "Auto Screenshots: ON"
+            self.auto_toggle_item.title = "Auto Screenshots: ON"
+            # Reset counters when re-enabling
+            self.idle_skip_count = 0
+            self.previous_screenshot_hashes = {}
+            self.update_idle_skip_counter()
             self.start_auto_screenshots()
             rumps.notification(
                 title=APP_NAME,
@@ -90,7 +192,7 @@ class MacCappyApp(rumps.App):
                 message=f"Taking screenshots every {SCREENSHOT_INTERVAL} seconds"
             )
         else:
-            sender.title = "Auto Screenshots: OFF"
+            self.auto_toggle_item.title = "Auto Screenshots: OFF"
             self.stop_auto_screenshots()
             self.title = APP_ICON  # Reset title
             rumps.notification(

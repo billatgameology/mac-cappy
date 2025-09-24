@@ -16,9 +16,13 @@ python mac_cappy.py
 ### Features Implemented
 - ✅ **Menu Bar Interface**: Camera emoji (📸) appears in menu bar
 - ✅ **Automatic Screenshots**: Takes screenshots every 60 seconds automatically
+- ✅ **Smart Duplicate Detection**: Compares screenshots before saving to avoid idle duplicates
+- ✅ **Clock-Aware Sampling**: Uses 3 sample areas (center, left, right) to avoid clock changes
+- ✅ **Idle Skip Counter**: Shows how many duplicate screenshots were skipped
 - ✅ **Manual Milestone Capture**: Screenshots + text note on demand
 - ✅ **Toggle Auto Screenshots**: Enable/disable automatic mode
-- ✅ **Time Display**: Menu bar shows last capture time
+- ✅ **Time Display**: Menu bar shows last capture time (with skip indicator)
+- ✅ **Memory Efficient**: Screenshot comparison done in memory using MD5 hashes
 - ✅ **Organized Storage**: Files saved in `~/Documents/mac-cappy/`
   - Auto Screenshots: `~/Documents/mac-cappy/Captures/YYYY-MM-DD/*-auto-screen-*.png`
   - Milestone Screenshots: `~/Documents/mac-cappy/Captures/YYYY-MM-DD/*-milestone-screen-*.png`
@@ -29,7 +33,7 @@ python mac_cappy.py
 ### Menu Options
 1. **Manual Capture + Note**: Takes screenshots + prompts for milestone note
 2. **Auto Screenshots: ON/OFF**: Toggle automatic screenshot mode (60-second interval)
-3. **Check Permissions**: Test and fix screen recording permissions
+3. **Idle Skips: X**: Shows count of duplicate screenshots skipped (resets on toggle)
 4. **Debug: Open Log Folder**: Opens logs directory in Finder
 
 ### File Structure
@@ -63,6 +67,11 @@ The built app will be in `dist/mac_cappy.app`
 - [ ] Menu bar icon appears (📸)
 - [ ] Auto screenshots start immediately (every 60 seconds)
 - [ ] Menu bar title updates with last capture time (📸 HH:MM)
+- [ ] Duplicate detection works even with clock changes (uses sample areas)
+- [ ] Leave computer idle for 2+ minutes - should see skip counter increment
+- [ ] Menu shows "📸 HH:MM (skip)" when duplicates detected
+- [ ] "Idle Skips: X" counter increments when duplicates found
+- [ ] Skip counter resets to 0 when toggling auto screenshots
 - [ ] Manual milestone capture works (screenshots + note dialog)
 - [ ] Toggle auto screenshots on/off works
 - [ ] Files save to correct locations with proper naming
