@@ -63,51 +63,30 @@ class MacCappyApp(rumps.App):
     
     def get_screenshot_hash(self, sct, monitor_id):
         """Get a hash of the screenshot for comparison without saving to disk.
-        Uses multiple small sample areas to avoid clock changes."""
+        Excludes top 10% of screen to avoid clock changes."""
         try:
             # Get monitor dimensions
             monitor = sct.monitors[monitor_id]
             width = monitor['width']
             height = monitor['height']
             
-            # Define multiple sample areas (avoiding corners where clocks usually are)
-            sample_size = 100  # 100x100 pixel samples
-            sample_areas = [
-                # Center
-                {
-                    'top': monitor['top'] + height // 2 - sample_size // 2,
-                    'left': monitor['left'] + width // 2 - sample_size // 2,
-                    'width': sample_size,
-                    'height': sample_size
-                },
-                # Left middle
-                {
-                    'top': monitor['top'] + height // 2 - sample_size // 2,
-                    'left': monitor['left'] + width // 4 - sample_size // 2,
-                    'width': sample_size,
-                    'height': sample_size
-                },
-                # Right middle
-                {
-                    'top': monitor['top'] + height // 2 - sample_size // 2,
-                    'left': monitor['left'] + 3 * width // 4 - sample_size // 2,
-                    'width': sample_size,
-                    'height': sample_size
-                }
-            ]
+            # Define area excluding top 10% (where clock/menu bar usually are)
+            exclude_top_percent = 0.10
+            top_margin = int(height * exclude_top_percent)
             
-            # Capture all sample areas and combine hashes
-            combined_hash = hashlib.md5()
-            for area in sample_areas:
-                try:
-                    screenshot = sct.grab(area)
-                    screenshot_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
-                    combined_hash.update(screenshot_bytes)
-                except:
-                    # If any sample fails, skip it
-                    continue
+            capture_area = {
+                'top': monitor['top'] + top_margin,
+                'left': monitor['left'],
+                'width': width,
+                'height': height - top_margin
+            }
             
-            return combined_hash.hexdigest()
+            # Capture the screen area excluding the top
+            screenshot = sct.grab(capture_area)
+            
+            # Convert to bytes and hash
+            screenshot_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
+            return hashlib.md5(screenshot_bytes).hexdigest()
             
         except Exception as e:
             print(f"Hash generation failed for monitor {monitor_id}: {e}")

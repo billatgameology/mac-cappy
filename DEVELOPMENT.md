@@ -17,7 +17,8 @@ python mac_cappy.py
 - ✅ **Menu Bar Interface**: Camera emoji (📸) appears in menu bar
 - ✅ **Automatic Screenshots**: Takes screenshots every 60 seconds automatically
 - ✅ **Smart Duplicate Detection**: Compares screenshots before saving to avoid idle duplicates
-- ✅ **Clock-Aware Sampling**: Uses 3 sample areas (center, left, right) to avoid clock changes
+- ✅ **Clock-Aware Coverage**: Excludes top 10% of screen (90% coverage) to avoid menu bar/clock changes  
+- ✅ **High-Resolution Support**: Works with ultrawide and high-DPI displays
 - ✅ **Idle Skip Counter**: Shows how many duplicate screenshots were skipped
 - ✅ **Manual Milestone Capture**: Screenshots + text note on demand
 - ✅ **Toggle Auto Screenshots**: Enable/disable automatic mode
@@ -67,7 +68,8 @@ The built app will be in `dist/mac_cappy.app`
 - [ ] Menu bar icon appears (📸)
 - [ ] Auto screenshots start immediately (every 60 seconds)
 - [ ] Menu bar title updates with last capture time (📸 HH:MM)
-- [ ] Duplicate detection works even with clock changes (uses sample areas)
+- [ ] Duplicate detection works with 90% screen coverage (excludes top 10%)
+- [ ] Works properly with ultrawide/high-resolution displays
 - [ ] Leave computer idle for 2+ minutes - should see skip counter increment
 - [ ] Menu shows "📸 HH:MM (skip)" when duplicates detected
 - [ ] "Idle Skips: X" counter increments when duplicates found
