@@ -11,7 +11,6 @@ from datetime import datetime
 APP_NAME = "mac-cappy"
 BASE_DIR = os.path.expanduser(f"~/Documents/{APP_NAME}")
 CAPTURES_DIR = os.path.join(BASE_DIR, "Captures")
-LOGS_DIR = os.path.join(BASE_DIR, "Logs")
 APP_ICON = "📸"
 SCREENSHOT_INTERVAL = 60  # seconds 
 
@@ -21,26 +20,28 @@ class MacCappyApp(rumps.App):
         
         # Initialize skip counter and previous screenshot hashes
         self.idle_skip_count = 0
+        self.manual_capture_count = 0
         self.previous_screenshot_hashes = {}  # monitor_id -> hash
         
         # Create menu items with references
         self.auto_toggle_item = rumps.MenuItem("Auto Screenshots: ON", callback=self.toggle_auto_screenshots)
         self.skip_counter_item = rumps.MenuItem("Idle Skips: 0", callback=None)
+        self.manual_counter_item = rumps.MenuItem("Manual Captures: 0", callback=None)
         
         self.menu = [
-            "Manual Capture + Note", 
+            "Manual Capture", 
             "---", 
             self.auto_toggle_item,
             self.skip_counter_item,
+            self.manual_counter_item,
             "---",
-            "Debug: Open Log Folder", 
+            "Debug: Open Today's Captures", 
             "---"
         ]
         
         # Ensure base directories exist
         try:
             os.makedirs(CAPTURES_DIR, exist_ok=True)
-            os.makedirs(LOGS_DIR, exist_ok=True)
         except Exception as e:
             rumps.alert(title="Setup Error", message=f"Failed to create directories: {e}")
         
@@ -96,6 +97,11 @@ class MacCappyApp(rumps.App):
         """Update the idle skip counter in the menu."""
         self.skip_counter_item.title = f"Idle Skips: {self.idle_skip_count}"
         print(f"[DEBUG] Updated idle skip counter to: {self.idle_skip_count}")
+    
+    def update_manual_capture_counter(self):
+        """Update the manual capture counter in the menu."""
+        self.manual_counter_item.title = f"Manual Captures: {self.manual_capture_count}"
+        print(f"[DEBUG] Updated manual capture counter to: {self.manual_capture_count}")
 
     def take_auto_screenshot(self, sender):
         """Take automatic screenshots without user interaction, with duplicate detection."""
@@ -180,122 +186,70 @@ class MacCappyApp(rumps.App):
                 message="Manual capture only"
             )
 
-    @rumps.clicked("Manual Capture + Note")
+    @rumps.clicked("Manual Capture")
     def capture_milestone(self, _):
-        """Takes screenshots, asks for a note, and saves to a new log file."""
+        """Takes screenshots manually without note prompt."""
         timestamp = datetime.now()
         date_folder = timestamp.strftime("%Y-%m-%d")
         time_filename_base = timestamp.strftime("%H-%M-%S")
         
-        # 1. Create directory for today's captures and logs
+        # Create directory for today's captures
         today_captures_dir = os.path.join(CAPTURES_DIR, date_folder)
-        today_logs_dir = os.path.join(LOGS_DIR, date_folder)
         
         try:
             os.makedirs(today_captures_dir, exist_ok=True)
-            os.makedirs(today_logs_dir, exist_ok=True)
         except Exception as e:
             rumps.alert(title="Directory Error", message=f"Failed to create today's folders: {e}")
             return
         
-        # 2. Capture screenshots of all monitors - SIMPLE VERSION LIKE ORIGINAL
+        # Capture screenshots of all monitors
         screenshot_paths = []
         try:
             with mss.mss() as sct:
                 for i, monitor in enumerate(sct.monitors[1:], 1): # sct.monitors[0] is all screens
-                    filename = os.path.join(today_captures_dir, f"{time_filename_base}-milestone-screen-{i}.png")
+                    filename = os.path.join(today_captures_dir, f"{time_filename_base}-manual-screen-{i}.png")
                     sct.shot(mon=i, output=filename)
                     screenshot_paths.append(filename)
+            
+            # Increment manual capture counter
+            self.manual_capture_count += 1
+            self.update_manual_capture_counter()
                     
             rumps.notification(
                 title=APP_NAME,
-                subtitle="Screenshots Captured!",
-                message=f"Saved {len(screenshot_paths)} screen(s). Now, add your note."
+                subtitle="Manual Capture Complete!",
+                message=f"Saved {len(screenshot_paths)} screen(s). Total manual captures: {self.manual_capture_count}"
             )
         except Exception as e:
             rumps.alert(title="Screenshot Error", message=f"Failed to capture screens: {e}")
             return
 
-        # 3. Ask for a developer note
-        window = rumps.Window(
-            message="What was the breakthrough or milestone you just reached?",
-            title="Add Developer Note",
-            ok="Save Milestone",
-            cancel="Cancel"
-        )
-        response = window.run()
-
-        # 4. Save the log entry to a new file if the user provided text
-        if response.clicked and response.text.strip():
-            note = response.text.strip()
-            log_content = self.format_log_entry(timestamp, note, screenshot_paths)
-            log_filename = f"{time_filename_base}-milestone.md"
-            log_filepath = os.path.join(today_logs_dir, log_filename)
-            
-            try:
-                with open(log_filepath, "w", encoding="utf-8") as f:
-                    f.write(log_content)
-                
-                rumps.notification(
-                    title=APP_NAME,
-                    subtitle="Milestone Saved!",
-                    message=f"Log saved to {log_filename}"
-                )
-            except Exception as e:
-                rumps.alert(title="Save Error", message=f"Failed to save log file: {e}\n\nThis might be a permissions issue with the Documents folder.")
-        else:
-             rumps.notification(
-                title=APP_NAME,
-                subtitle="Capture Canceled",
-                message="The milestone was not saved."
-            )
-
-    @rumps.clicked("Debug: Open Log Folder")
+    @rumps.clicked("Debug: Open Today's Captures")
     def open_log_folder(self, _):
-        """Opens the logs directory in Finder for easy access during development."""
+        """Opens today's captures directory in Finder."""
+        timestamp = datetime.now()
+        date_folder = timestamp.strftime("%Y-%m-%d")
+        today_captures_dir = os.path.join(CAPTURES_DIR, date_folder)
+        
         try:
-            if os.path.exists(LOGS_DIR):
-                subprocess.run(["open", LOGS_DIR])
+            if os.path.exists(today_captures_dir):
+                subprocess.run(["open", today_captures_dir])
                 rumps.notification(
                     title=APP_NAME,
                     subtitle="Folder Opened",
-                    message="Logs folder opened in Finder"
+                    message=f"Opened today's captures folder ({date_folder})"
                 )
             else:
                 # Create the directory first, then open it
-                os.makedirs(LOGS_DIR, exist_ok=True)
-                subprocess.run(["open", LOGS_DIR])
+                os.makedirs(today_captures_dir, exist_ok=True)
+                subprocess.run(["open", today_captures_dir])
                 rumps.notification(
                     title=APP_NAME,
                     subtitle="Folder Created & Opened",
-                    message="Created and opened logs folder in Finder"
+                    message=f"Created and opened today's captures folder ({date_folder})"
                 )
         except Exception as e:
-            rumps.alert(title="Folder Error", message=f"Failed to open logs folder: {e}")
-
-    def format_log_entry(self, timestamp, note, image_paths):
-        """Formats the milestone into a Markdown string for a new file."""
-        formatted_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Create markdown links for each image using relative paths for better portability
-        image_links = ""
-        for i, path in enumerate(image_paths, 1):
-            # Get relative path from logs directory to captures directory
-            rel_path = os.path.relpath(path, os.path.dirname(os.path.dirname(path)))
-            image_links += f"![Screen {i}]({rel_path})\n\n"
-            
-        return f"""# Milestone: {formatted_timestamp}
-
-{note}
-
----
-
-## Captures
-
-{image_links}---
-
-*Captured with mac-cappy*
-"""
+            rumps.alert(title="Folder Error", message=f"Failed to open captures folder: {e}")
 
     def quit_application(self):
         """Clean shutdown of the application."""

@@ -20,22 +20,22 @@ python mac_cappy.py
 - ✅ **Clock-Aware Coverage**: Excludes top 10% of screen (90% coverage) to avoid menu bar/clock changes  
 - ✅ **High-Resolution Support**: Works with ultrawide and high-DPI displays
 - ✅ **Idle Skip Counter**: Shows how many duplicate screenshots were skipped
-- ✅ **Manual Milestone Capture**: Screenshots + text note on demand
+- ✅ **Manual Capture**: One-click screenshot capture without note prompts
+- ✅ **Manual Capture Counter**: Tracks total manual captures taken
 - ✅ **Toggle Auto Screenshots**: Enable/disable automatic mode
 - ✅ **Time Display**: Menu bar shows last capture time (with skip indicator)
 - ✅ **Memory Efficient**: Screenshot comparison done in memory using MD5 hashes
-- ✅ **Organized Storage**: Files saved in `~/Documents/mac-cappy/`
-  - Auto Screenshots: `~/Documents/mac-cappy/Captures/YYYY-MM-DD/*-auto-screen-*.png`
-  - Milestone Screenshots: `~/Documents/mac-cappy/Captures/YYYY-MM-DD/*-milestone-screen-*.png`
-  - Logs: `~/Documents/mac-cappy/Logs/YYYY-MM-DD/*-milestone.md`
-- ✅ **Debug Menu**: "Debug: Open Log Folder" for easy access
-- ✅ **Improved Error Handling**: Better user feedback for common issues
+- ✅ **Organized Storage**: Files saved in `~/Documents/mac-cappy/Captures/YYYY-MM-DD/`
+  - Auto Screenshots: `*-auto-screen-*.png`
+  - Manual Screenshots: `*-manual-screen-*.png`
+- ✅ **Quick Access**: Debug menu opens today's capture folder in Finder
 
 ### Menu Options
-1. **Manual Capture + Note**: Takes screenshots + prompts for milestone note
+1. **Manual Capture**: Takes screenshots immediately without note prompt
 2. **Auto Screenshots: ON/OFF**: Toggle automatic screenshot mode (60-second interval)
 3. **Idle Skips: X**: Shows count of duplicate screenshots skipped (resets on toggle)
-4. **Debug: Open Log Folder**: Opens logs directory in Finder
+4. **Manual Captures: X**: Shows total count of manual captures taken (resets on app restart)
+5. **Debug: Open Today's Captures**: Opens today's capture folder in Finder
 
 ### File Structure
 ```
@@ -74,11 +74,12 @@ The built app will be in `dist/mac_cappy.app`
 - [ ] Menu shows "📸 HH:MM (skip)" when duplicates detected
 - [ ] "Idle Skips: X" counter increments when duplicates found
 - [ ] Skip counter resets to 0 when toggling auto screenshots
-- [ ] Manual milestone capture works (screenshots + note dialog)
+- [ ] Manual capture works (no note prompt, just takes screenshots)
+- [ ] "Manual Captures: X" counter increments with each manual capture
+- [ ] Manual counter resets to 0 when app restarts
 - [ ] Toggle auto screenshots on/off works
-- [ ] Files save to correct locations with proper naming
-- [ ] Debug menu opens Finder
-- [ ] Error handling works (try without screen recording permission)
+- [ ] Files save to correct locations with proper naming (*-auto-*.png, *-manual-*.png)
+- [ ] "Debug: Open Today's Captures" opens correct folder
 - [ ] App quits cleanly (stops auto timer)
 
 ### Common Issues
